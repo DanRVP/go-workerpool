@@ -1,0 +1,42 @@
+[
+    {
+        "identifier" : "job 1",
+        "command": "php",
+        "args": ["test.php"]
+    },
+    {
+        "identifier" : "job 2",
+        "command": "php",
+        "args": ["test.php"]
+    },
+    {
+        "identifier" : "job 3",
+        "command": "php",
+        "args": ["test.php"]
+    },
+    {
+        "identifier" : "job 4",
+        "command": "php",
+        "args": ["test.php"]
+    },
+    {
+        "identifier" : "job 5",
+        "command": "php",
+        "args": ["test.php"]
+    },
+    {
+        "identifier" : "job 6",
+        "command": "php",
+        "args": ["test.php"]
+    },
+    {
+        "identifier" : "job 7",
+        "command": "php",
+        "args": ["test.php"]
+    },
+    {
+        "identifier" : "job 8",
+        "command": "php",
+        "args": ["test.php"]
+    }
+]
