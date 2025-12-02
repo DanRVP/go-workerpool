@@ -27,16 +27,20 @@ func main() {
 		Action:  run,
 		Suggest: true,
 		Version: "v0.0.1",
+		Arguments: []cli.Argument{
+			&cli.StringArg{
+				Name:      "tasks",
+				UsageText: "(Optional) JSON encoded string of tasks to execute. If omitted then the --infile option must be used",
+			},
+		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:     "infile",
-				Usage:    "The path to the file which contains the task definitions",
-				Required: true,
-				Aliases:  []string{"i"},
+				Name:    "infile",
+				Usage:   "(Optional) The path to the file which contains the task definitions. Will override the tasks argument if included",
+				Aliases: []string{"i"},
 			},
 			&cli.StringFlag{
 				Name:    "outfile",
-				Value:   "",
 				Usage:   "(Optional) The path to the file which should receive the results",
 				Aliases: []string{"o"},
 			},
@@ -63,19 +67,28 @@ func main() {
 // Run a set of tasks in parallel and await the results
 func run(ctx context.Context, cmd *cli.Command) error {
 	var err error
+	var tasks_todo []Task
 
-	infilePath := cmd.String("infile")
 	verbose := cmd.Bool("verbose")
+	taskArg := cmd.StringArg("tasks")
+	infilePath := cmd.String("infile")
 
-	out(fmt.Sprintf("Getting tasks from %s", infilePath), verbose)
-	fileContents, err := os.ReadFile(infilePath)
-	if err != nil {
-		message := fmt.Sprintf("Unable to read infile. Error was: %v", err)
+	var taskBytes []byte
+	if taskArg == "" && infilePath == "" {
+		message := "You must provide a JSON list of tasks in the first argument or define a filepath using --infile"
 		return cli.Exit(message, 1)
+	} else if taskArg != "" {
+		taskBytes = []byte(taskArg)
+	} else {
+		out(fmt.Sprintf("Getting tasks from %s", infilePath), verbose)
+		taskBytes, err = os.ReadFile(infilePath)
+		if err != nil {
+			message := fmt.Sprintf("Unable to read infile. Error was: %v", err)
+			return cli.Exit(message, 1)
+		}
 	}
 
-	var tasks_todo []Task
-	err = json.Unmarshal(fileContents, &tasks_todo)
+	err = json.Unmarshal(taskBytes, &tasks_todo)
 	if err != nil {
 		message := fmt.Sprintf("Unable to unmarshal infile. Error was: %v", err)
 		return cli.Exit(message, 1)

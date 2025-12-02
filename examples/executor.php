@@ -61,15 +61,10 @@ const JOBS = [
     ]
 ];
 
-$filename = 'infile.json';
-$put_res = file_put_contents($filename, json_encode(JOBS));
-if ($put_res === false) {
-    echo "Unable to write infile $infile";
-    return;
-}
 
-// Run jobs from infile with max 4 worker threads
-exec("./go-workerpool -i $filename -t 4", $stdout);
+// Run jobs from arguments with max 4 worker threads
+$jobs = json_encode(JOBS);
+exec("./go-workerpool -t 4 '$jobs'", $stdout);
 if (empty($stdout)) {
     echo "No output from job. Consider running in verbose mode\n";
     return;
