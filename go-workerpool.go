@@ -77,15 +77,15 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	if taskArg == "" && infilePath == "" {
 		message := "You must provide a JSON list of tasks in the first argument or define a filepath using --infile"
 		return cli.Exit(message, 1)
-	} else if taskArg != "" {
-		taskBytes = []byte(taskArg)
-	} else {
+	} else if infilePath != "" {
 		out(fmt.Sprintf("Getting tasks from %s", infilePath), verbose)
 		taskBytes, err = os.ReadFile(infilePath)
 		if err != nil {
 			message := fmt.Sprintf("Unable to read infile. Error was: %v", err)
 			return cli.Exit(message, 1)
 		}
+	} else {
+		taskBytes = []byte(taskArg)
 	}
 
 	err = json.Unmarshal(taskBytes, &tasks_todo)
