@@ -2,6 +2,22 @@
 
 Simple CLI program to invoke multiple processes in parallel using goroutines.
 
+## Why?
+I needed to solve a problem. I had to run existing PHP code in parallel and wait for the results, then continue with those results in PHP. As PHP is not a natively multithreaded language and the technique of using `exec` in a non-blocking manner to run tasks in parallel would complicate waiting for and fetching results if gave myself the following brief:
+
+```
+The overarching approach will be to use a language which supports parallelisation (in our case Go) and use that to manage the PHP processes which will build, make and process HTTP requests.
+
+The process manager written in Go should have the following characteristics:
+
+1. Be reusable: The processor should be job agnostic. A properly configured PHP shell should be able to be used by the shell regardless of the job being done.
+2. Be configurable: The total number of parallel processes should be able to be controlled.
+3. Be invokable via PHP: We need to be able to run this manager from within PHP code.
+4. Be able to listen for and collate results from each of the child processes.
+```
+
+The result of this is this repo
+
 ## Compiling
 - Install golang
 - Run `go build go-workerpool.go` to generate an executable binary
