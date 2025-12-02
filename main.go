@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -15,11 +15,18 @@ import (
 )
 
 func main() {
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   "print only the version",
+	}
+
 	cmd := &cli.Command{
-		Name:    "Run",
+		Name:    "go-workerpool",
 		Usage:   "Run a set of tasks in parallel and await the results",
 		Action:  run,
 		Suggest: true,
+		Version: "v0.0.1",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "infile",
@@ -30,19 +37,19 @@ func main() {
 			&cli.StringFlag{
 				Name:    "outfile",
 				Value:   "",
-				Usage:   "The path to the file which should receive the results",
+				Usage:   "(Optional) The path to the file which should receive the results",
 				Aliases: []string{"o"},
 			},
 			&cli.IntFlag{
 				Name:    "max_threads",
 				Value:   2,
-				Usage:   "Set the maximum of parallel goroutines which can run tasks",
+				Usage:   "(Optional) Set the maximum of parallel goroutines which can run tasks",
 				Aliases: []string{"t"},
 			},
 			&cli.BoolFlag{
 				Name:    "verbose",
 				Value:   false,
-				Usage:   "Whether to enable verbose mode or not",
+				Usage:   "(Optional) Whether to enable verbose mode or not. When disabled only the result JSON is output",
 				Aliases: []string{"v"},
 			},
 		},
@@ -75,10 +82,10 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	maxThreads := cmd.Int("max_threads")
-	out(fmt.Sprintf("max_threads set to %d\n", maxThreads), verbose)
+	out(fmt.Sprintf("max_threads set to %d", maxThreads), verbose)
 
 	length := len(tasks_todo)
-	out(fmt.Sprintf("%d tasks to process\n", length), verbose)
+	out(fmt.Sprintf("%d tasks to process", length), verbose)
 	if length < 1 {
 		return nil
 	}
@@ -89,9 +96,9 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	var wg sync.WaitGroup
 
 	// Start workers
-	for range workerCount {
+	for i := range workerCount {
 		wg.Add(1)
-		go worker(&wg, tasks, results, verbose)
+		go worker(i+1, &wg, tasks, results, verbose)
 	}
 
 	// Send jobs
@@ -122,7 +129,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 
 	outfile := cmd.String("outfile")
 	if outfile == "" {
-		fmt.Printf("%s\n", json)
+		fmt.Printf("%s", json)
 		return nil
 	}
 
@@ -131,28 +138,52 @@ func run(ctx context.Context, cmd *cli.Command) error {
 }
 
 // Run a task in its own thread and push to results
-func worker(wg *sync.WaitGroup, tasks <-chan *Task, results chan<- *Result, verbose bool) {
+func worker(workerId int, wg *sync.WaitGroup, tasks <-chan *Task, results chan<- *Result, verbose bool) {
 	defer wg.Done()
+	prefix := fmt.Sprintf("Worker %d", workerId)
 
 	for task := range tasks {
-		fullCommand := strings.TrimSpace(task.Command + " " + strings.Join(task.Args, " "))
 		cmd := exec.Command(task.Command, task.Args...)
-		out(fmt.Sprintf("Running %s\n", fullCommand), verbose)
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			message := fmt.Sprintf("Unable to open stdout pipe for %s. Error was %v", task.Identifier, err)
+			out(message, verbose)
+			results <- &Result{
+				Identifier: task.Identifier,
+				ExitCode:   1,
+				ResultBody: message,
+			}
 
+			continue
+		}
+
+		out(fmt.Sprintf("%s: Starting %s", prefix, task.Identifier), verbose)
 		exitCode := 0
 		resultBody := ""
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Start(); err != nil {
+			out(fmt.Sprintf("%s: Unable to start \"%s\". Error was %v", prefix, task.Identifier, err), verbose)
+			continue
+		}
+
+		resultBytes, err := io.ReadAll(stdout)
+		if err != nil {
+			out(fmt.Sprintf("%s: Unable to read result body bytes for %s. Error was: %v", prefix, task.Identifier, err), verbose)
+		} else {
+			resultBody = string(resultBytes)
+		}
+
+		err = cmd.Wait()
+		if err != nil {
+			out(fmt.Sprintf("%s: Error when running %s. Error was: %v", prefix, task.Identifier, err), verbose)
 			if exitError, ok := err.(*exec.ExitError); ok {
 				status := exitError.Sys().(syscall.WaitStatus)
 				exitCode = status.ExitStatus()
 			}
-
-			out(fmt.Sprintf("Unable to run \"%s\". Error was %v\n", fullCommand, err), verbose)
-		} else {
-			resultBody = fullCommand
 		}
 
+		out(fmt.Sprintf("%s: Finished %s", prefix, task.Identifier), verbose)
 		results <- &Result{
+			Identifier: task.Identifier,
 			ExitCode:   exitCode,
 			ResultBody: resultBody,
 		}
@@ -167,9 +198,9 @@ func out(message string, verbose bool) {
 }
 
 type Task struct {
-	Identifier string
-	Command    string
-	Args       []string
+	Identifier string   `json:"identifier"`
+	Command    string   `json:"command"`
+	Args       []string `json:"args"`
 }
 
 type Result struct {

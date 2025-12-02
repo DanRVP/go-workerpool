@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
-// Simulate some work on thread
 sleep(rand(0, 2));
+$failure = rand(0, 1);
+if ($failure) {
+    echo "Failure";
+} else {
+    echo "The time is " . time();
+}
 
-// "Randomise" exit code
-exit(rand(0, 1));
+exit($failure);
