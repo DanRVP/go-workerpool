@@ -129,7 +129,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 
 	outfile := cmd.String("outfile")
 	if outfile == "" {
-		fmt.Printf("%s", json)
+		fmt.Println(string(json))
 		return nil
 	}
 
